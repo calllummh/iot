@@ -1,30 +1,31 @@
 from machine import UART, Pin, I2C
 import time
+import utime
 import urequests
 import ujson
 from ahtx0 import AHT20
 import network
 
 # Firebase Configuration
-FIREBASE_URL = "https://siotch-default-rtdb.europe-west1.firebasedatabase.app/"  # Replace with your Firebase URL
+FIREBASE_URL = "https://siotch-default-rtdb.europe-west1.firebasedatabase.app/"  # Firebase URL
 DB_PATH = "/air_quality.json"
-FIREBASE_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" # Add API key on the end
-EMAIL = "callum.hargrove21@imperial.ac.uk"  # Replace with your Firebase email
-PASSWORD = ""  # Replace with your Firebase password
+FIREBASE_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="  # With API key on the end
+EMAIL = "callum.hargrove21@imperial.ac.uk"  # Firebase email
+PASSWORD = ""  # Firebase password
 id_token = None  # Firebase authentication token
 
-# Wi-Fi Configuration
-WIFI_SSID = "Bethwall Guest"
-WIFI_PASSWORD = "climbing"
+# Wi-Fi Configuration (climbing centre WiFi)
+WIFI_SSID = "BethWall Guest"
+WIFI_PASSWORD = ""
 
 # Unique Arch Identifier
-ARCH_ID = "Arch "  # Change to "Arch B", "Arch C", "Arch D" for other devices
+ARCH_ID = "Arch C"  # Arch Letter, varying per device
 
 # ZPH02 Sensor Configuration
 uart = UART(1, baudrate=9600, tx=Pin(17), rx=Pin(13))  # TX (17), RX (13)
 
 # AHT20 Sensor Configuration
-i2c = I2C(0, scl=Pin(23), sda=Pin(22))  # D33 (SCL), D22 (SDA)
+i2c = I2C(0, scl=Pin(23), sda=Pin(22))  # D23 (SCL) and D22 (SDA)
 
 # Initialise AHT20 Sensor
 try:
@@ -54,13 +55,21 @@ def authenticate():
         print("Authentication failed:", e)
 
 def read_zph02():
-    if uart.any():
-        data = uart.read(9)
-        if data and data[0] == 0xFF and data[1] == 0x18:
-            pm25 = (data[2] << 8) | data[3]
-            pm10 = (data[4] << 8) | data[5]
-            return pm25, pm10
-    return None, None
+    """Read PM2.5 data from ZPH02 sensor via UART."""
+    try:
+        if uart.any():  # Check if data is available on UART
+            data = uart.read(9)  # Attempt to read a 9-byte frame
+            print("Raw UART Data:", data)  # Debug print raw data
+            if data and len(data) == 9 and data[0] == 0xFF and data[1] == 0x18:  # Validate frame
+                pm25 = ((data[2] << 8) | data[3])  # pm data in µg/m³
+                return pm25
+            else:
+                print("Invalid data frame or insufficient bytes")
+        else:
+            print("No data available on UART")
+    except Exception as e:
+        print("Error reading ZPH02 sensor:", e)
+    return None
 
 def read_aht20():
     try:
@@ -94,27 +103,38 @@ def main():
     authenticate()
     print("Starting air quality monitoring...")
 
+    # Warm-up delay for ZPH02
+    warm_up_duration = 60  # 1 minute in seconds
+    print(f"Waiting {warm_up_duration} seconds for ZPH02 sensor warm-up...")
+    time.sleep(warm_up_duration)
+
     while True:
-        pm25, pm10 = read_zph02()
+        pm25 = read_zph02()
         temperature, humidity = read_aht20()
 
-        if pm25 is not None and pm10 is not None:
-            print(f"{ARCH_ID} - PM2.5: {pm25} µg/m³, PM10: {pm10} µg/m³")
+        if pm25 is not None:
+            print(f"{ARCH_ID} - PM2.5: {pm25} µg/m³")
+        else:
+            print(f"{ARCH_ID} - Failed to read PM2.5")
+
         if temperature is not None and humidity is not None:
             print(f"{ARCH_ID} - Temperature: {temperature} °C, Humidity: {humidity} %")
 
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        timestamp = "{}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
+            utime.localtime()[0], utime.localtime()[1], utime.localtime()[2],
+            utime.localtime()[3], utime.localtime()[4], utime.localtime()[5]
+        )
         data = {
             "arch": ARCH_ID,
             "timestamp": timestamp,
             "pm25": pm25,
-            "pm10": pm10,
             "temperature": temperature,
             "humidity": humidity
         }
 
         upload_to_firebase(data)
-        time.sleep(30)
+        time.sleep(30)  # Data reading interval in seconds
 
 if __name__ == "__main__":
     main()
+
