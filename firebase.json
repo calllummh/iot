@@ -6,9 +6,24 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "**/*.@(css|js)", 
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "text/css"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/javascript"
+          }
+        ]
+      }
+    ],
     "rewrites": [
       {
-        "source": "**",
+        "source": "**", 
         "destination": "/index.html"
       }
     ]
