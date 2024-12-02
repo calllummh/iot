@@ -6,6 +6,7 @@
     <title>Bethwall Real-Time Air Quality</title>
     <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="app.js" defer></script>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,18 +15,19 @@
     <div id="controls">
         <label for="arch-select">Select Arch:</label>
         <select id="arch-select">
-            <option value="">[Not Selected]</option>
-            <option value="Arch A">Arch A</option>
-            <option value="Arch B">Arch B</option>
-            <option value="Arch C">Arch C</option>
-            <option value="Arch D">Arch D</option>
+            <option value="">[Select]</option>
+            <option value="a">A</option>
+            <option value="b">B</option>
+            <option value="c">C</option>
         </select>
     </div>
     <div id="map">
-        <img src="centre_map.png" alt="Centre Map">
+        <img src="centre_map.png" alt="Centre Map" id="map-image">
     </div>
     <div id="charts">
-        <!-- Charts will load here -->
+        <canvas id="pm25-chart"></canvas>
+        <canvas id="temperature-chart"></canvas>
+        <canvas id="humidity-chart"></canvas>
     </div>
 </body>
 </html>

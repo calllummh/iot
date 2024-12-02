@@ -1,43 +1,103 @@
-/* jslint es6 */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.8/firebase-app.js";
-import { getDatabase, ref, query, onValue, orderByChild } from "https://www.gstatic.com/firebasejs/9.6.8/firebase-database.js";
+"use strict";
 
 // Firebase Configuration
-const firebaseConfig = {
+var firebaseConfig = {
     apiKey: "AIzaSyDpE2uZyh7Pmk-nw0Mz3g3apr8UYQZ80mU",
-    authDomain: "siotch-default-rtdb.firebaseapp.com",
+    authDomain: "https://siotch.web.app",
     databaseURL: "https://siotch-default-rtdb.europe-west1.firebasedatabase.app/",
-    projectId: "siotch",
-    storageBucket: "siotch.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
+    projectId: "siotch"}
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const database = getDatabase(app);
+firebase.initializeApp(firebaseConfig);
+var database = firebase.database();
 
 // DOM Elements
-const archSelect = document.getElementById("arch-select");
-const chartsContainer = document.getElementById("charts");
+var archSelect = document.getElementById("arch-select");
+var pm25ChartElem = document.getElementById("pm25-chart");
+var temperatureChartElem = document.getElementById("temperature-chart");
+var humidityChartElem = document.getElementById("humidity-chart");
 
-archSelect.addEventListener("change", (event) => {
-    const arch = event.target.value;
+// Initialize Charts
+function initChart(label, yAxisLabel) {
+    return new Chart(document.getElementById(label), {
+        type: "line",
+        data: {
+            labels: [], // Timestamps
+            datasets: [{
+                label: yAxisLabel,
+                data: [],
+                borderColor: "rgba(75, 192, 192, 1)",
+                backgroundColor: "rgba(75, 192, 192, 0.2)",
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { title: { display: true, text: "Timestamp" } },
+                y: { title: { display: true, text: yAxisLabel } }
+            }
+        }
+    });
+}
+
+var pm25Chart = initChart("pm25-chart", "PM2.5 (µg/m³)");
+var temperatureChart = initChart("temperature-chart", "Temperature (°C)");
+var humidityChart = initChart("humidity-chart", "Humidity (%)");
+
+// Event Listener for Arch Selection
+archSelect.addEventListener("change", function () {
+    var arch = archSelect.value;
     if (arch) {
-        loadCharts(arch);
+        loadData(arch);
+    } else {
+        clearCharts();
     }
 });
 
-function loadCharts(arch) {
-    const archRef = query(ref(database, "air_quality"), orderByChild("arch"), equalTo(arch));
+// Load Data for Selected Arch
+function loadData(arch) {
+    var refPath = "air_quality";
+    var ref = database.ref(refPath);
+    ref.orderByChild("arch").equalTo(arch).on("value", function (snapshot) {
+        if (snapshot.exists()) {
+            var data = snapshot.val();
+            var timestamps = [];
+            var pm25Values = [];
+            var temperatureValues = [];
+            var humidityValues = [];
 
-    onValue(archRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            // Populate charts
-            console.log(data);
+            Object.keys(data).forEach(function (key) {
+                var entry = data[key];
+                timestamps.push(entry.timestamp);
+                pm25Values.push(entry.pm25);
+                temperatureValues.push(entry.temperature);
+                humidityValues.push(entry.humidity);
+            });
+
+            updateChart(pm25Chart, timestamps, pm25Values, "PM2.5 (µg/m³)");
+            updateChart(temperatureChart, timestamps, temperatureValues, "Temperature (°C)");
+            updateChart(humidityChart, timestamps, humidityValues, "Humidity (%)");
         } else {
-            chartsContainer.innerHTML = "<p>No data available for this arch.</p>";
+            clearCharts();
         }
+    });
+}
+
+// Update Chart with New Data
+function updateChart(chart, labels, data, label) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = data;
+    chart.data.datasets[0].label = label;
+    chart.update();
+}
+
+// Clear All Charts
+function clearCharts() {
+    [pm25Chart, temperatureChart, humidityChart].forEach(function (chart) {
+        chart.data.labels = [];
+        chart.data.datasets[0].data = [];
+        chart.data.datasets[0].label = "";
+        chart.update();
     });
 }
